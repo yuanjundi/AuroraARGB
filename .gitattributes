@@ -1,0 +1,14 @@
+# 统一换行符，避免 Windows/Linux 协作时 diff 全是空白变更
+* text=auto eol=lf
+
+*.py    text
+*.md    text
+*.iss   text
+*.spec  text
+*.txt   text
+
+# 二进制
+*.png   binary
+*.ico   binary
+*.exe   binary
+*.dll   binary

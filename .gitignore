@@ -1,0 +1,20 @@
+# 构建产物
+dist/
+installer/
+build/
+*.pdb
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+
+# 第三方二进制：体积大，且各自遵循不同许可证，请按 README 自行获取
+third_party/lhm/*.dll
+
+# 本地运行时产物
+*.log
+_shots/
