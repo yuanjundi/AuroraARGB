@@ -58,13 +58,13 @@ Windows 下的机箱灯效与风扇控制器。**直接驱动主板上的 ARGB �
 
 ### 用安装包
 
-下载 `AuroraARGB-Setup-*.exe`，双击安装。默认装到 `C:\Program Files\AuroraARGB`，安装向导里可以改路径。
+从 [Releases](../../releases/latest) 下载 `AuroraARGB-Setup-*.exe`，双击安装。默认装到 `C:\Program Files\AuroraARGB`，安装向导里可以改路径。
 
 安装时可勾选「开机自动启动」，装完会在 `HKCU\...\Run` 写入自启项，卸载时自动清理。
 
 ### 用绿色版
 
-下载 `AuroraARGB.exe` 直接运行。exe 自带 `requireAdministrator` 清单，双击即以管理员身份启动，无需右键。
+从 [Releases](../../releases/latest) 下载 `AuroraARGB.exe` 直接运行。exe 自带 `requireAdministrator` 清单，双击即以管理员身份启动，无需右键。
 
 ### 首次使用注意
 
