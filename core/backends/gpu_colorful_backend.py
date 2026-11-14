@@ -3,8 +3,9 @@
 和 `colorful.py`（主板 HID）不同，显卡这条走 GPU 自己的 I2C 总线，
 通过 NVAPI 的用户态接口访问，不占 HID、不需要内核驱动。
 
-一个限制：显卡灯带是**单区单色**（整条同时一种颜色），所以通道里只取
-第一颗灯珠的颜色下发。
+一个限制：显卡灯带物理上是多颗灯珠，但固件只开放「整条同色」写入口
+（逐颗寻址已穷举验证不可用，详见 `gpu_colorful.py` 顶部说明），
+所以通道里只取第一颗灯珠的颜色下发。亮度由 11 字节包里的亮度字节承载。
 """
 from __future__ import annotations
 
@@ -78,7 +79,7 @@ class ColorfulGpuBackend(Backend):
                 led_count=1,
                 kind="gpu",
                 backend_id=self.id,
-                note="NVAPI I2C · 单区单色（整条同色）",
+                note="NVAPI I2C · 整条同色",
                 extra={"addr": "0x61", "port": 1},
             )
         ]

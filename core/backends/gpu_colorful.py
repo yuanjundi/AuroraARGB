@@ -17,8 +17,24 @@ GPU 自己的 I2C 总线。NVIDIA 通过 NVAPI 暴露了用户态的 I2C 读写�
 
     CRC = 前 9 字节的累加和，低字节在前。
 
-整条灯带是单区单色，所以 11 字节就够。另有一种 122 字节的 V2 包（38 颗灯珠
-逐颗设色），只在 RTX 4070 Vulcan 上使用。
+整条灯带是单区单色，所以 11 字节就够。第 6 字节是硬件亮度（0xFF 最亮）。
+
+关于「逐颗控制」的实测结论（2026-11-14，iGame RTX 4060 Ti Mini）
+-----------------------------------------------------------------
+灯带本身是多颗灯珠（出厂彩虹动画能看出流动），但**没有任何可用的逐颗
+寻址通道**，四条路都试过了：
+
+    1. 第 4 字节当索引：发 0x02 整包被忽略，只有 0x01 有效
+    2. 第 6 字节当区间：实际是亮度，见上
+    3. V2 包（122 字节 / 38 灯）：完全忽略
+    4. V2 换 5 种灯珠数（12/18/24/30/38）：同样无反应
+
+另外把 GPU 的 I2C 端口 0-10、地址 0x08-0x77 全扫过一遍，0x61 是唯一
+灯控设备。所以逐颗渲染在这块卡上做不到，只能整条同色；想要「彩虹感」
+就让颜色随时间沿光谱流动（选彩虹类灯效即可）。
+
+另有一种 122 字节的 V2 包（38 颗灯珠逐颗设色），只在 RTX 4070 Vulcan /
+4090 Neptune 上使用，且 OpenRGB 的实现在 V2 里也是把所有灯珠填同一色。
 
 协议事实来源
 ------------
@@ -70,9 +86,22 @@ class NV_I2C_INFO_V3(ctypes.Structure):
     ]
 
 
-def build_packet(r: int, g: int, b: int) -> bytes:
-    """构造 V1 设色包（11 字节），含累加和校验。整条灯带同色。"""
-    body = [0xAA, 0xEF, 0x12, 0x03, 0x01, 0xFF,
+def build_packet(r: int, g: int, b: int, brightness: int = 0xFF) -> bytes:
+    """构造 V1 设色包（11 字节），含累加和校验。整条灯带同色。
+
+        AA EF 12 03 01 FF  R G B  CRC_L CRC_H
+
+    第 6 字节 = **亮度**，不是灯珠区间。实测（2026-11-14，RTX 4060 Ti Mini）：
+
+        0xFF  整条最亮
+        0x26  中等，明显变暗
+        0x06  很暗，暗到几乎像熄灭
+        0x01  基本看不见
+
+    早期误以为 01 FF 是「第 1 颗到第 255 颗」的区间，用 01 06 试过，
+    结果是整条变暗而不是只剩 6 颗亮，因此确认是亮度。
+    """
+    body = [0xAA, 0xEF, 0x12, 0x03, 0x01, brightness & 0xFF,
             r & 0xFF, g & 0xFF, b & 0xFF]
     crc = sum(body) & 0xFFFF
     return bytes(body + [crc & 0xFF, (crc >> 8) & 0xFF])
@@ -88,10 +117,12 @@ def build_packet_v2(colors) -> bytes:
         校验       前 120 字节累加和，低字节在前
 
     ⚠ 实测结论（2026-11-14）：RTX 4060 Ti Mini **完全忽略**这个包。
-    两种测法都没反应——只点第 0 颗、以及 38 颗全品红。所以这块卡只认
-    V1（11 字节整条单色）。原因很可能是它侧面亮的是 iGame LOGO 背光板，
-    物理上就没有可寻址灯珠。这里保留实现，供其它型号（如 4070 Vulcan）
-    参考，不影响主流程。
+    两种测法都没反应——只点第 0 颗、以及 38 颗全品红；后面又按 5 种
+    不同灯珠数（12/18/24/30/38）各发过一次，同样没有任何反应。
+    所以这块卡只认 V1（11 字节 + 亮度）。注意：这张卡的灯带本身是多颗
+    灯珠（出厂彩虹动画能看出流动），只是固件不开放逐颗写入口。
+    这里保留实现，供其它型号（如 4070 Vulcan / 4090 Neptune）参考，
+    不影响主流程。
     """
     body = bytearray([0xAA, 0xEF, 0x01, 0x04, 0x88, 0x26])
     for i in range(V2_MAX_LEDS):
@@ -245,9 +276,9 @@ class ColorfulGpu:
             return False
         return True
 
-    def set_color(self, r: int, g: int, b: int) -> bool:
-        pkt = build_packet(r, g, b)
-        st = self.write(pkt)
+    def set_color(self, r: int, g: int, b: int, brightness: int = 0xFF) -> bool:
+        """整条设为同一颜色。brightness 0-255，硬件级亮度。"""
+        st = self.write(build_packet(r, g, b, brightness))
         if st != NVAPI_OK:
             self.last_error = "设色写入失败，状态 %d" % st
             return False
