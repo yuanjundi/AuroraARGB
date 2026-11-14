@@ -21,6 +21,7 @@ DEFAULTS: Dict[str, Any] = {
     "fps": 30,
     "theme": "dark",
     "openrgb": True,
+    "gpu_light": True,
     "startup_apply": True,
     "tray_hint": False,
     "window": [1200, 780],

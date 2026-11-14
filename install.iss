@@ -4,7 +4,7 @@
 
 #define AppName "Aurora ARGB Studio"
 #define AppShortName "AuroraARGB"
-#define AppVersion "1.6.0"
+#define AppVersion "1.8.0"
 #define AppPublisher "Aurora"
 #define AppExe "AuroraARGB.exe"
 

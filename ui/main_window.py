@@ -30,6 +30,7 @@ from core import effects as FX
 from core import __version__
 from core.backends import Channel
 from core.backends.colorful import ColorfulBackend
+from core.backends.gpu_colorful_backend import ColorfulGpuBackend
 from core.backends.openrgb import OpenRGBBackend
 from core.engine import Engine
 
@@ -633,6 +634,16 @@ class MainWindow(QWidget):
         except Exception:
             chans = []
         self.channels.extend(chans)
+
+        # 显卡灯带：走 GPU 自己的 I2C（NVAPI），和主板 HID 完全独立
+        if self.cfg.get("gpu_light", True):
+            gb = ColorfulGpuBackend()
+            self.backends["colorful_gpu"] = gb
+            try:
+                gch = gb.scan()
+            except Exception:
+                gch = []
+            self.channels.extend(gch)
 
         if self.cfg.get("openrgb", True):
             ob = OpenRGBBackend()

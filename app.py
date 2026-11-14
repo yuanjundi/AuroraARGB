@@ -17,6 +17,29 @@ if "--boot" in sys.argv:
     sys.exit(_boot_main())
 
 
+# 单实例守卫。必须放在 _claim_gui_slot() 之前：
+# 否则第二个实例会覆盖 gui.pid，守护进程会误判，两个界面同时抢 HID。
+# --shot 是自测截图用的，特意放行，方便在有实例运行时验证界面。
+
+# 「以管理员身份重启并停掉厂商服务」这条路径：旧进程可能还在退出中，
+# 所以先把服务停掉（这一步不依赖窗口），再给足时间等锁释放。
+if "--stop-vendor" in sys.argv:
+    try:
+        from core.backends.colorful import ColorfulBackend
+        ColorfulBackend.stop_vendor_service()
+    except Exception:
+        pass
+
+if "--shot" not in sys.argv:
+    from core import config as _CFG
+    from core.single_instance import acquire, activate_existing
+
+    _wait = 6000 if "--stop-vendor" in sys.argv else 250
+    if not acquire(os.path.join(str(_CFG.config_dir()), "app.lock"), _wait):
+        activate_existing()
+        sys.exit(0)
+
+
 # 告诉守护进程「界面的主程序已经起来了，你可以让位了」。
 # 先写 pid，再等它退出，最后才创建窗口，避免两边同时写 HID 把灯写花。
 def _claim_gui_slot() -> str:
@@ -90,16 +113,15 @@ def main() -> None:
     if os.path.isfile(ico):
         app.setWindowIcon(QIcon(ico))
 
-    # 以管理员身份重启后自动接管：停掉厂商常驻服务，避免两边抢设备导致灯闪
-    if "--stop-vendor" in sys.argv:
-        try:
-            from core.backends.colorful import ColorfulBackend
-            ColorfulBackend.stop_vendor_service()
-        except Exception:
-            pass
-
     win = MainWindow(start_tab=1 if "--fan" in sys.argv else 0)
     win.show()
+
+    # 又有人双击了一次 → 把已经开着的这个窗口叫到前台，而不是再开一个进程
+    try:
+        from core.single_instance import serve
+        serve(win._restore_from_tray)
+    except Exception:
+        pass
 
     # 自测用：--shot <路径> 启动若干秒后自动截图并退出
     if "--shot" in sys.argv:
