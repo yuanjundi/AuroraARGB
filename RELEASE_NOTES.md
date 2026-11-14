@@ -28,8 +28,8 @@
 
 ### 装机说明
 
-- 安装包：`AuroraARGB-Setup-1.8.2.exe`（约 45 MB），安装到 `D:\AuroraARGB`（安装时可改），带开始菜单、卸载项、可选开机自启
-- 免安装单文件：`AuroraARGB.exe`（约 43 MB），双击即静默提权运行
+- 安装包：`AuroraARGB-Setup-1.8.2.exe`（43.1 MB），安装到 `D:\AuroraARGB`（安装时可改），带开始菜单、卸载项、可选开机自启
+- 免安装单文件：`AuroraARGB.exe`（41.5 MB），双击即静默提权运行
 - 需要管理员权限（风扇 PWM 走内核端口 I/O）；灯效本身不需要
 - 系统要求：Windows 10/11 x64，已装 .NET 运行时（风扇模块依赖）
 - 如果装了 iGame Center，它的服务会抢 ARGB 控制器导致灯闪，程序内提供「停止厂商服务」按钮
