@@ -140,11 +140,13 @@ def build_packet_v2(colors) -> bytes:
 class ColorfulGpu:
     """一块七彩虹显卡的灯控。用 with 语句或显式 open()/close()。"""
 
-    def __init__(self) -> None:
+    def __init__(self, port: int = I2C_PORT, addr: int = I2C_ADDR) -> None:
         self._nvapi = None
         self._handle: Optional[int] = None
         self._read = None
         self._write = None
+        self._port = port
+        self._addr = addr
         self.ready = False
         self.last_error = ""
         self.gpu_name = ""
@@ -234,14 +236,14 @@ class ColorfulGpu:
         info = NV_I2C_INFO_V3()
         info.version = VER3
         info.bIsDDCPort = 0
-        info.i2cDevAddress = (I2C_ADDR << 1) & 0xFF
+        info.i2cDevAddress = (self._addr << 1) & 0xFF
         info.pbI2cRegAddress = ctypes.POINTER(ctypes.c_uint8)()
         info.regAddrSize = 0
         info.pbData = data_ptr
         info.cbSize = n
         info.i2cSpeed = 0xFFFF
         info.i2cSpeedKhz = 0
-        info.portId = I2C_PORT
+        info.portId = self._port
         info.bIsPortIdSet = 1
         return info
 
@@ -252,9 +254,20 @@ class ColorfulGpu:
         ex = ctypes.c_uint32(0)
         return self._write(self._handle, ctypes.byref(info), ctypes.byref(ex))
 
-    def read(self, n: int = 64) -> Tuple[int, bytes]:
+    def read(self, n: int = 64, reg: Optional[int] = None) -> Tuple[int, bytes]:
+        """读 n 字节。reg 为 None 时走纯块读（无寄存器地址）。
+
+        iGame Center 的两种读法都在端口 1 上：
+            0x50  无寄存器  27 字节   RGB 回显
+            0x58  寄存器=1   6 字节   型号探测
+        """
         buf = (ctypes.c_uint8 * n)()
         info = self._info(buf, n)
+        regbuf = None
+        if reg is not None:
+            regbuf = (ctypes.c_uint8 * 1)(reg & 0xFF)
+            info.pbI2cRegAddress = regbuf
+            info.regAddrSize = 1
         ex = ctypes.c_uint32(0)
         st = self._read(self._handle, ctypes.byref(info), ctypes.byref(ex))
         return st, bytes(buf[:n])
