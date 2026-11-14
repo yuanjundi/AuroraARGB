@@ -49,6 +49,8 @@ I2C_ADDR = 0x61
 
 HANDSHAKE = (0xAA, 0xEF, 0x81, 0x02, 0x1C, 0x02)
 PACKET_V1_LEN = 11
+PACKET_V2_LEN = 122
+V2_MAX_LEDS = 38             # (122 - 6 - 2) / 3
 
 
 class NV_I2C_INFO_V3(ctypes.Structure):
@@ -69,11 +71,39 @@ class NV_I2C_INFO_V3(ctypes.Structure):
 
 
 def build_packet(r: int, g: int, b: int) -> bytes:
-    """构造 V1 设色包（11 字节），含累加和校验。"""
+    """构造 V1 设色包（11 字节），含累加和校验。整条灯带同色。"""
     body = [0xAA, 0xEF, 0x12, 0x03, 0x01, 0xFF,
             r & 0xFF, g & 0xFF, b & 0xFF]
     crc = sum(body) & 0xFFFF
     return bytes(body + [crc & 0xFF, (crc >> 8) & 0xFF])
+
+
+def build_packet_v2(colors) -> bytes:
+    """构造 V2 设色包（122 字节），最多 38 颗灯珠逐颗设色。
+
+    colors: [(r,g,b), ...]，不足 38 颗的补黑。
+
+        头 6 字节  AA EF 01 04 88 26
+        灯珠数据   38 × RGB = 114 字节
+        校验       前 120 字节累加和，低字节在前
+
+    ⚠ 实测结论（2026-11-14）：RTX 4060 Ti Mini **完全忽略**这个包。
+    两种测法都没反应——只点第 0 颗、以及 38 颗全品红。所以这块卡只认
+    V1（11 字节整条单色）。原因很可能是它侧面亮的是 iGame LOGO 背光板，
+    物理上就没有可寻址灯珠。这里保留实现，供其它型号（如 4070 Vulcan）
+    参考，不影响主流程。
+    """
+    body = bytearray([0xAA, 0xEF, 0x01, 0x04, 0x88, 0x26])
+    for i in range(V2_MAX_LEDS):
+        c = colors[i] if i < len(colors) else (0, 0, 0)
+        body.append(c[0] & 0xFF)
+        body.append(c[1] & 0xFF)
+        body.append(c[2] & 0xFF)
+    assert len(body) == PACKET_V2_LEN - 2, len(body)
+    crc = sum(body) & 0xFFFF
+    body.append(crc & 0xFF)
+    body.append((crc >> 8) & 0xFF)
+    return bytes(body)
 
 
 class ColorfulGpu:
@@ -220,5 +250,14 @@ class ColorfulGpu:
         st = self.write(pkt)
         if st != NVAPI_OK:
             self.last_error = "设色写入失败，状态 %d" % st
+            return False
+        return True
+
+    def set_colors(self, colors) -> bool:
+        """V2 逐颗设色（最多 38 颗）。部分型号可能不支持。"""
+        pkt = build_packet_v2(colors)
+        st = self.write(pkt)
+        if st != NVAPI_OK:
+            self.last_error = "V2 写入失败，状态 %d" % st
             return False
         return True
